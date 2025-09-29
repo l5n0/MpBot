@@ -1,5 +1,8 @@
 import asyncio
+import os
 from utils.filename_utils import sanitize_filename, get_unique_filename
+
+DOWNLOAD_TIMEOUT = 300  # Timeout in Sekunden (5 Minuten)
 
 async def get_video_title(url: str) -> str:
     process = await asyncio.create_subprocess_exec(
@@ -13,10 +16,29 @@ async def get_video_title(url: str) -> str:
         return sanitize_filename(title)
     return "output"
 
+async def _download(cmd, msg, format):
+    process = await asyncio.create_subprocess_exec(*cmd,
+                                                   stdout=asyncio.subprocess.PIPE,
+                                                   stderr=asyncio.subprocess.STDOUT)
+    while True:
+        line = await process.stdout.readline()
+        if not line:
+            break
+        line_str = line.decode('utf-8').strip()
+        if "%" in line_str:
+            try:
+                percent = line_str.split("%")[0].split()[-1]
+                await msg.edit(content=f"Downloading {format.upper()}... {percent}%")
+            except Exception:
+                pass
+    await process.wait()
+    return process.returncode
+
 async def download_video(url, format, msg):
     ext = "mp3" if format == "mp3" else "mp4"
     title = await get_video_title(url)
     filename = get_unique_filename(title, ext)
+
     if format == "mp3":
         cmd = [
             "yt-dlp",
@@ -37,23 +59,13 @@ async def download_video(url, format, msg):
             url,
         ]
 
-    process = await asyncio.create_subprocess_exec(*cmd,
-                                                   stdout=asyncio.subprocess.PIPE,
-                                                   stderr=asyncio.subprocess.STDOUT)
-
-    while True:
-        line = await process.stdout.readline()
-        if not line:
-            break
-        line_str = line.decode('utf-8').strip()
-        if "%" in line_str:
-            try:
-                percent = line_str.split("%")[0].split()[-1]
-                await msg.edit(content=f"Downloading {format.upper()}... {percent}%")
-            except Exception:
-                pass
-
-    await process.wait()
-    if process.returncode != 0:
+    try:
+        retcode = await asyncio.wait_for(_download(cmd, msg, format), timeout=DOWNLOAD_TIMEOUT)
+    except asyncio.TimeoutError:
+        await msg.edit(content="Error: Download took too long and was cancelled.")
         return None
+
+    if retcode != 0:
+        return None
+
     return filename
