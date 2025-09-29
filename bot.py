@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
-import uuid
+import re
 from dotenv import load_dotenv
 
 load_dotenv()  # Lädt Umgebungsvariablen aus .env
@@ -15,9 +15,34 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
+def sanitize_filename(name: str) -> str:
+    # Entfernt unzulässige Zeichen aus Dateinamen z.B. Windows ungültige
+    return re.sub(r'[\\/*?:"<>|]', "", name)
+
+def get_unique_filename(base_name, ext):
+    filename = f"{base_name}.{ext}"
+    counter = 1
+    while os.path.exists(filename):
+        filename = f"{base_name}({counter}).{ext}"
+        counter += 1
+    return filename
+
+async def get_video_title(url: str) -> str:
+    process = await asyncio.create_subprocess_exec(
+        'yt-dlp', '--get-title', url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, _ = await process.communicate()
+    if process.returncode == 0:
+        title = stdout.decode().strip()
+        return sanitize_filename(title)
+    return "output"
+
 async def download_video(url, format):
     ext = "mp3" if format == "mp3" else "mp4"
-    filename = f"{uuid.uuid4()}.{ext}"
+    title = await get_video_title(url)
+    filename = get_unique_filename(title, ext)
     if format == "mp3":
         cmd = [
             "yt-dlp",
