@@ -7,7 +7,7 @@ from utils.downloader import download_video, is_supported_url
 
 LOG_FILE = 'bot.log'
 MAX_LOG_LINES = 1000
-TRIM_LINES = 500 
+TRIM_LINES = 500  # Anzahl der Zeilen, die gelöscht werden, wenn Limit erreicht ist
 
 def trim_log_file():
     if not os.path.isfile(LOG_FILE):
@@ -15,7 +15,6 @@ def trim_log_file():
     with open(LOG_FILE, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     if len(lines) >= MAX_LOG_LINES:
-        # Lösche die ersten TRIM_LINES Zeilen
         with open(LOG_FILE, 'w', encoding='utf-8') as f:
             f.writelines(lines[TRIM_LINES:])
 
@@ -105,6 +104,37 @@ async def mp3(ctx, url: str):
         logger.info(f"Uploaded MP3 file {filename} for user {ctx.author}")
     else:
         err_msg = "Error: Could not download MP3."
+        logger.error(f"{err_msg} URL: {url} User: {ctx.author}")
+        await msg.edit(content=err_msg)
+
+@bot.command()
+async def gif(ctx, url: str):
+    await check_and_trim_log()
+    logger.info(f"GIF command received from user {ctx.author} with url: {url}")
+    if not is_supported_url(url):
+        msg = "Error: The URL platform is not supported."
+        logger.warning(msg + f" URL: {url}")
+        await ctx.send(msg)
+        return
+
+    msg = await ctx.send("Starting GIF download...")
+    filename = await download_video(url, "gif", msg)
+    if filename:
+        filesize = os.path.getsize(filename)
+        if filesize > DISCORD_UPLOAD_LIMIT:
+            msg_error = f"Error: The GIF file is too large to upload ({filesize/1_048_576:.2f} MB). Max size is 8 MB."
+            logger.warning(msg_error + f" Filename: {filename}, User: {ctx.author}")
+            await msg.edit(content=msg_error)
+            os.remove(filename)
+            return
+
+        await msg.edit(content=f"Uploading {filename}...")
+        await ctx.send(file=discord.File(filename))
+        os.remove(filename)
+        await msg.delete()
+        logger.info(f"Uploaded GIF file {filename} for user {ctx.author}")
+    else:
+        err_msg = "Error: Could not download GIF."
         logger.error(f"{err_msg} URL: {url} User: {ctx.author}")
         await msg.edit(content=err_msg)
 
