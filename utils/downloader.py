@@ -1,8 +1,34 @@
 import asyncio
 import os
+from urllib.parse import urlparse
 from utils.filename_utils import sanitize_filename, get_unique_filename
 
 DOWNLOAD_TIMEOUT = 300  # Timeout in Sekunden (5 Minuten)
+
+# Unterstützte Plattformen (Domains)
+SUPPORTED_DOMAINS = [
+    "youtube.com", "youtu.be",
+    "vimeo.com",
+    "soundcloud.com",
+    "facebook.com",
+    "twitch.tv",
+    "dailymotion.com",
+    "bilibili.com",
+    "twitter.com",
+    "tiktok.com",
+    "instagram.com",
+]
+
+def is_supported_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        for d in SUPPORTED_DOMAINS:
+            if d in domain:
+                return True
+        return False
+    except Exception:
+        return False
 
 async def get_video_title(url: str) -> str:
     process = await asyncio.create_subprocess_exec(

@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-from utils.downloader import download_video
+from utils.downloader import download_video, is_supported_url
 
 load_dotenv()
 
@@ -18,6 +18,10 @@ DISCORD_UPLOAD_LIMIT = 8 * 1024 * 1024  # 8 MB
 
 @bot.command()
 async def mp4(ctx, url: str):
+    if not is_supported_url(url):
+        await ctx.send("Error: The URL platform is not supported.")
+        return
+
     msg = await ctx.send("Starting MP4 download...")
     filename = await download_video(url, "mp4", msg)
     if filename:
@@ -36,6 +40,10 @@ async def mp4(ctx, url: str):
 
 @bot.command()
 async def mp3(ctx, url: str):
+    if not is_supported_url(url):
+        await ctx.send("Error: The URL platform is not supported.")
+        return
+
     msg = await ctx.send("Starting MP3 download...")
     filename = await download_video(url, "mp3", msg)
     if filename:
